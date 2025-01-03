@@ -15,8 +15,6 @@ import FreeCAD as App
 import FreeCADGui
 import importDXF
 import importSVG
-
-# import QtGui
 import Part
 import requests
 from FreeCAD import Rotation, Vector  # NoQa
@@ -512,6 +510,14 @@ class EngineFreecad:
         return file_list
 
 
+def set_task_state(server_address: str, job_id: str, state: str):
+    url = server_address + f"/jobs/{job_id}/tasks"
+    payload = {"name": "freecad", "state": state}
+    response = requests.post(url, json=payload, timeout=20)
+    logging.info(response)
+    # Check the state. The server should raise some error if state change was not allowed.
+
+
 def get_jobs(server_address) -> dict:
     """Find the next job to work on.
 
@@ -524,16 +530,24 @@ def get_jobs(server_address) -> dict:
 
     """
     while True:
-        reply = requests.get(server_address + "/jobs/", timeout=20)
+        # TODO: Add filter for only FreeCAD Jobs. At the moment all Jobs are FreeCAD only.
+        reply = requests.get(server_address + "/jobs", timeout=20)
         job_list = reply.json().get("data", [])
         # TODO: Consider randomising the list so two instances of FreeCAD take different files.
         if not job_list:
+            logging.warning("No Jobs on the Server.")
             time.sleep(2)
             continue
+        taken_jobs = 0
         for job in job_list:
-            if job.get("attributes", {}).get("state", {}).get("job") == "CREATED":
-                # TODO: Do a take & check here.
+            if job.get("attributes", {}).get("state", {}).get("tasks", {}).get("freecad") == "CREATED":
+                set_task_state(server_address, job[id], "RUNNING")
+                taken_jobs += 1
                 yield job
+        if taken_jobs == 0:
+            logging.warning("From the %s jobs on the server none of them needs processing.", len(job_list))
+            time.sleep(5)
+
     return None
 
 
@@ -565,18 +579,16 @@ def upload_files(server_address: str, job: dict, file_list: list[Path]):
             else:
                 break  # out of the while loop
         if retry == 0:
-            break  # out of the for loop, dont go into else.
+            break  # out of the for loop, skip for-else.
     else:
         # Success
-        url = server_address + f"/jobs/{job['id']}/state"
-        response = requests.get(url, timeout=20)
-        logging.info(response)
+        set_task_state(server_address, job[id], "COMPLETED")
 
 
 def main(cycax_server_address: str):
 
     engine = EngineFreecad()
-    task_counter = 5
+    task_counter = 50
     for job in get_jobs(cycax_server_address):
         with tempfile.TemporaryDirectory() as tmpdirname:
             task_counter -= 1
