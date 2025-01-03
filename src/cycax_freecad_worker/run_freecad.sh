@@ -1,4 +1,4 @@
-#./!/bin/bash
+#!/bin/bash
 set -e
 
 if [ -z "${CYCAX_SERVER}" ]
@@ -8,9 +8,9 @@ then
   exit 5
 fi
 
-if [ -n "${2}" ]
+if [ -n "${1}" ]
 then
-  FREECADAPP=${2}
+  FREECADAPP=${1}
 else
   echo "No AppImage path specified on the command line, search in ~/Applications."
   FREECADAPP=$(find ~/Applications -name "FreeCAD*.AppImage" | sort | tail -1)
@@ -29,4 +29,4 @@ echo "To stop run the command: touch ${WORKING_DIR}/.quit"
 echo
 echo "Starting FreeCAD and looking for jobs in ${WORKING_DIR}"
 export CYCAX_JOBS_DIR=${WORKING_DIR}
-${FREECADAPP} ${DIR}/cycax_client_freecad.py
+${FREECADAPP} ./cycax_client_freecad.py
