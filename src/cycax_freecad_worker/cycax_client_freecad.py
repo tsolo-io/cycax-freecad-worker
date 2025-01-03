@@ -480,7 +480,7 @@ class EngineFreecad:
             job:
         """
 
-        name = job_id
+        name = f"FC{job_id}"
         logging.info("Definition loaded for: %s", name)
 
         if App.ActiveDocument:
