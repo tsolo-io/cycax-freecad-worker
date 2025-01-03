@@ -587,13 +587,12 @@ def main(cycax_server_address: str):
             logging.warning("Part creation took %s seconds", time.time() - _start)
             upload_files(cycax_server_address, job, file_list)
             if task_counter < 0:
-                logging.warning(
-                    "Done enough work, I quit. Should run this with a service manager that can restart me."
-                )
+                logging.warning("Done enough work, I quit. Should run this with a service manager that can restart me.")
                 break
 
 
-if os.environ.get("PYTEST_VERSION") is not None:
+if os.environ.get("PYTEST_VERSION") is None:
+    # Not in the unit test.
     # START
     cycax_server_address = os.getenv("CYCAX_SERVER").strip("/")
     if cycax_server_address is None:
