@@ -35,6 +35,8 @@ FRONT = "FRONT"
 BACK = "BACK"
 REAR = "BACK"
 
+MAX_SLEEP_DURATION = 5
+
 
 class EngineFreecad:
     """This class will be used in FreeCAD to decode a JSON passed to it.
@@ -469,7 +471,7 @@ class EngineFreecad:
         logging.info("Part Saved: %s", filepath)
         return filepath
 
-    def build(self, part_path: Path, definition: dict) -> list[Path]:
+    def build(self, part_path: Path, definition: dict, job_id: str) -> list[Path]:
         """
         Build the part in FreeCAD.
 
@@ -478,9 +480,7 @@ class EngineFreecad:
             job:
         """
 
-        if "name" not in definition:
-            definition["name"] = definition["id"]
-        name = definition["name"]
+        name = job_id
         logging.info("Definition loaded for: %s", name)
 
         if App.ActiveDocument:
@@ -529,25 +529,35 @@ def get_jobs(server_address) -> dict:
         jobs_path: The directory with symlinks to parts to process.
 
     """
+    sleep_for: int = 1
+    sleep_now = False
     while True:
-        # TODO: Add filter for only FreeCAD Jobs. At the moment all Jobs are FreeCAD only.
-        reply = requests.get(server_address + "/jobs", timeout=20)
-        job_list = reply.json().get("data", [])
-        # TODO: Consider randomising the list so two instances of FreeCAD take different files.
-        if not job_list:
-            logging.warning("No Jobs on the Server.")
-            time.sleep(2)
-            continue
-        taken_jobs = 0
-        for job in job_list:
-            if job.get("attributes", {}).get("state", {}).get("tasks", {}).get("freecad") == "CREATED":
-                set_task_state(server_address, job[id], "RUNNING")
-                taken_jobs += 1
-                yield job
-        if taken_jobs == 0:
-            logging.warning("From the %s jobs on the server none of them needs processing.", len(job_list))
-            time.sleep(5)
+        try:
+            if sleep_now:
+                sleep_now = False
+                time.sleep(sleep_for)
+                if sleep_for < MAX_SLEEP_DURATION:
+                    sleep_for += 1
+            reply = requests.get(server_address + "/jobs", timeout=20)
+            job_list = reply.json().get("data", [])
+            # TODO: Consider randomising the list so two instances of FreeCAD take different files.
+            if not job_list:
+                logging.warning("No Jobs on the Server.")
+                sleep_now = True
+                continue
+            sleep_now = True
+            for job in job_list:
+                if job.get("attributes", {}).get("state", {}).get("tasks", {}).get("freecad") == "CREATED":
+                    set_task_state(server_address, job["id"], "RUNNING")
+                    sleep_for = 0
+                    sleep_now = False
+                    yield job
+            if sleep_now:
+                logging.warning("From the %s jobs on the server none of them needs processing.", len(job_list))
 
+        except requests.exceptions.ConnectionError as error:
+            logging.warning(error)
+            time.sleep(MAX_SLEEP_DURATION)
     return None
 
 
@@ -582,7 +592,7 @@ def upload_files(server_address: str, job: dict, file_list: list[Path]):
             break  # out of the for loop, skip for-else.
     else:
         # Success
-        set_task_state(server_address, job[id], "COMPLETED")
+        set_task_state(server_address, job["id"], "COMPLETED")
 
 
 def main(cycax_server_address: str):
@@ -595,7 +605,7 @@ def main(cycax_server_address: str):
             part_path = Path(tmpdirname)
             job_spec = get_job_spec(cycax_server_address, job)
             _start = time.time()
-            file_list = engine.build(part_path, job_spec)
+            file_list = engine.build(part_path, job_spec, job_id=job["id"])
             logging.warning("Part creation took %s seconds", time.time() - _start)
             upload_files(cycax_server_address, job, file_list)
             if task_counter < 0:
