@@ -27,6 +27,7 @@ logging.basicConfig(
 )
 logging.info("Opened in FreeCAD")
 
+PART_NO_TEMPLATE = "Pn--pN"
 LEFT = "LEFT"
 RIGHT = "RIGHT"
 TOP = "TOP"
@@ -225,7 +226,7 @@ class EngineFreecad:
         view = self.change_view(active_doc=active_doc, side=view, default="ALL")
         FreeCADGui.SendMsgToActiveView("ViewFit")
 
-        target_image_file = path / f"view-{view}.png"
+        target_image_file = path / f"{PART_NO_TEMPLATE}-{view}.png"
         active_doc.activeView().fitAll()
         active_doc.activeView().saveImage(str(target_image_file), 2000, 1800, "White")
         return target_image_file
@@ -280,7 +281,7 @@ class EngineFreecad:
         __objs__ = []
         __objs__.append(active_doc.getObject("Shape"))
 
-        target_image_file = path / f"view-{view}.dxf"
+        target_image_file = path / f"{PART_NO_TEMPLATE}-{view}.dxf"
         importDXF.export(__objs__, str(target_image_file))
         return target_image_file
 
@@ -296,7 +297,7 @@ class EngineFreecad:
         __objs__ = []
         __objs__.append(active_doc.getObject("Shape"))
 
-        target_image_file = path / f"view-{view}.svg"
+        target_image_file = path / f"{PART_NO_TEMPLATE}-{view}.svg"
         importSVG.export(__objs__, str(target_image_file))
         return target_image_file
 
@@ -305,7 +306,7 @@ class EngineFreecad:
         Args:
             active_doc: The FreeCAD document.
         """
-        target_image_file = path / "model.stl"
+        target_image_file = path / f"{PART_NO_TEMPLATE}.stl"
         for obj in active_doc.Objects:
             if obj.ViewObject.Visibility:
                 obj.Shape.exportStl(str(target_image_file))
@@ -466,7 +467,7 @@ class EngineFreecad:
         FreeCADGui.activeDocument().activeView().viewTop()
         FreeCADGui.SendMsgToActiveView("ViewFit")
 
-        filepath = part_path / "freecad.FCStd"
+        filepath = part_path / f"{PART_NO_TEMPLATE}.FCStd"
         doc.saveCopy(str(filepath))
         logging.info("Part Saved: %s", filepath)
         return filepath
