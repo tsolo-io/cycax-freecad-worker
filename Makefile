@@ -1,7 +1,6 @@
 .ONESHELL: # Run all the commands in the same shell
 .PHONY: docs
 .DEFAULT_GOAL := help
-DOCKER_BIN := $(shell which docker podman | head -n 1)
 TAG := $(shell hatch version)
 
 all: help
@@ -11,10 +10,12 @@ help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
 build: ## Build containers
-	hatch dep show requirements > requirements.txt
-	echo "." >> requirements.txt
-	$(DOCKER_BIN) build . -f Dockerfile -t tsolo/s3probe:${TAG}
-	docker compose build
+	mkdir -p dist
+	echo "#!/bin/bash" > dist/cycax-freecad-worker.sh
+	echo "VERSION=$(shell hatch version)" >> dist/cycax-freecad-worker.sh
+	cat src/cycax_freecad_worker/base.sh >> dist/cycax-freecad-worker.sh
+	cat src/cycax_freecad_worker/cycax_client_freecad.py | xz | base64 >> dist/cycax-freecad-worker.sh
+	chmod a+x dist/cycax-freecad-worker.sh
 
 run: ## Run the CyCAx Server directly
 	hatch run uvicorn cycax_server.main:app --reload --host 0.0.0.0 --port 8765

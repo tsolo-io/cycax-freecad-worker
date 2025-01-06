@@ -72,6 +72,9 @@ spell = "typos --exclude='**/*.svg' --exclude='**/*.css' --exclude='**/*.png' --
 fmt = ["black {args:.}", "ruff check --fix {args:.}", "style"]
 all = ["style", "typing"]
 
+[tool.typos.default.extend-words]
+Pn = "Pn"
+
 [tool.black]
 target-version = ["py310"]
 line-length = 120

@@ -15,8 +15,6 @@ import FreeCAD as App
 import FreeCADGui
 import importDXF
 import importSVG
-
-# import QtGui
 import Part
 import requests
 from FreeCAD import Rotation, Vector  # NoQa
@@ -29,6 +27,7 @@ logging.basicConfig(
 )
 logging.info("Opened in FreeCAD")
 
+PART_NO_TEMPLATE = "Pn--pN"
 LEFT = "LEFT"
 RIGHT = "RIGHT"
 TOP = "TOP"
@@ -36,6 +35,8 @@ BOTTOM = "BOTTOM"
 FRONT = "FRONT"
 BACK = "BACK"
 REAR = "BACK"
+
+MAX_SLEEP_DURATION = 5
 
 
 class EngineFreecad:
@@ -225,7 +226,7 @@ class EngineFreecad:
         view = self.change_view(active_doc=active_doc, side=view, default="ALL")
         FreeCADGui.SendMsgToActiveView("ViewFit")
 
-        target_image_file = path / f"view-{view}.png"
+        target_image_file = path / f"{PART_NO_TEMPLATE}-{view}.png"
         active_doc.activeView().fitAll()
         active_doc.activeView().saveImage(str(target_image_file), 2000, 1800, "White")
         return target_image_file
@@ -280,7 +281,7 @@ class EngineFreecad:
         __objs__ = []
         __objs__.append(active_doc.getObject("Shape"))
 
-        target_image_file = path / f"view-{view}.dxf"
+        target_image_file = path / f"{PART_NO_TEMPLATE}-{view}.dxf"
         importDXF.export(__objs__, str(target_image_file))
         return target_image_file
 
@@ -296,7 +297,7 @@ class EngineFreecad:
         __objs__ = []
         __objs__.append(active_doc.getObject("Shape"))
 
-        target_image_file = path / f"view-{view}.svg"
+        target_image_file = path / f"{PART_NO_TEMPLATE}-{view}.svg"
         importSVG.export(__objs__, str(target_image_file))
         return target_image_file
 
@@ -305,7 +306,7 @@ class EngineFreecad:
         Args:
             active_doc: The FreeCAD document.
         """
-        target_image_file = path / "model.stl"
+        target_image_file = path / f"{PART_NO_TEMPLATE}.stl"
         for obj in active_doc.Objects:
             if obj.ViewObject.Visibility:
                 obj.Shape.exportStl(str(target_image_file))
@@ -466,12 +467,12 @@ class EngineFreecad:
         FreeCADGui.activeDocument().activeView().viewTop()
         FreeCADGui.SendMsgToActiveView("ViewFit")
 
-        filepath = part_path / "freecad.FCStd"
+        filepath = part_path / f"{PART_NO_TEMPLATE}.FCStd"
         doc.saveCopy(str(filepath))
         logging.info("Part Saved: %s", filepath)
         return filepath
 
-    def build(self, part_path: Path, definition: dict) -> list[Path]:
+    def build(self, part_path: Path, definition: dict, job_id: str) -> list[Path]:
         """
         Build the part in FreeCAD.
 
@@ -480,9 +481,7 @@ class EngineFreecad:
             job:
         """
 
-        if "name" not in definition:
-            definition["name"] = definition["id"]
-        name = definition["name"]
+        name = f"FC{job_id}"
         logging.info("Definition loaded for: %s", name)
 
         if App.ActiveDocument:
@@ -512,6 +511,14 @@ class EngineFreecad:
         return file_list
 
 
+def set_task_state(server_address: str, job_id: str, state: str):
+    url = server_address + f"/jobs/{job_id}/tasks"
+    payload = {"name": "freecad", "state": state}
+    response = requests.post(url, json=payload, timeout=20)
+    logging.info(response)
+    # Check the state. The server should raise some error if state change was not allowed.
+
+
 def get_jobs(server_address) -> dict:
     """Find the next job to work on.
 
@@ -523,17 +530,35 @@ def get_jobs(server_address) -> dict:
         jobs_path: The directory with symlinks to parts to process.
 
     """
+    sleep_for: int = 1
+    sleep_now = False
     while True:
-        reply = requests.get(server_address + "/jobs/", timeout=20)
-        job_list = reply.json().get("data", [])
-        # TODO: Consider randomising the list so two instances of FreeCAD take different files.
-        if not job_list:
-            time.sleep(2)
-            continue
-        for job in job_list:
-            if job.get("attributes", {}).get("state", {}).get("job") == "CREATED":
-                # TODO: Do a take & check here.
-                yield job
+        try:
+            if sleep_now:
+                sleep_now = False
+                time.sleep(sleep_for)
+                if sleep_for < MAX_SLEEP_DURATION:
+                    sleep_for += 1
+            reply = requests.get(server_address + "/jobs", timeout=20)
+            job_list = reply.json().get("data", [])
+            # TODO: Consider randomising the list so two instances of FreeCAD take different files.
+            if not job_list:
+                logging.warning("No Jobs on the Server.")
+                sleep_now = True
+                continue
+            sleep_now = True
+            for job in job_list:
+                if job.get("attributes", {}).get("state", {}).get("tasks", {}).get("freecad") == "CREATED":
+                    set_task_state(server_address, job["id"], "RUNNING")
+                    sleep_for = 0
+                    sleep_now = False
+                    yield job
+            if sleep_now:
+                logging.warning("From the %s jobs on the server none of them needs processing.", len(job_list))
+
+        except requests.exceptions.ConnectionError as error:
+            logging.warning(error)
+            time.sleep(MAX_SLEEP_DURATION)
     return None
 
 
@@ -565,35 +590,32 @@ def upload_files(server_address: str, job: dict, file_list: list[Path]):
             else:
                 break  # out of the while loop
         if retry == 0:
-            break  # out of the for loop, dont go into else.
+            break  # out of the for loop, skip for-else.
     else:
         # Success
-        url = server_address + f"/jobs/{job['id']}/state"
-        response = requests.get(url, timeout=20)
-        logging.info(response)
+        set_task_state(server_address, job["id"], "COMPLETED")
 
 
 def main(cycax_server_address: str):
 
     engine = EngineFreecad()
-    task_counter = 5
+    task_counter = 50
     for job in get_jobs(cycax_server_address):
         with tempfile.TemporaryDirectory() as tmpdirname:
             task_counter -= 1
             part_path = Path(tmpdirname)
             job_spec = get_job_spec(cycax_server_address, job)
             _start = time.time()
-            file_list = engine.build(part_path, job_spec)
+            file_list = engine.build(part_path, job_spec, job_id=job["id"])
             logging.warning("Part creation took %s seconds", time.time() - _start)
             upload_files(cycax_server_address, job, file_list)
             if task_counter < 0:
-                logging.warning(
-                    "Done enough work, I quit. Should run this with a service manager that can restart me."
-                )
+                logging.warning("Done enough work, I quit. Should run this with a service manager that can restart me.")
                 break
 
 
-if os.environ.get("PYTEST_VERSION") is not None:
+if os.environ.get("PYTEST_VERSION") is None:
+    # Not in the unit test.
     # START
     cycax_server_address = os.getenv("CYCAX_SERVER").strip("/")
     if cycax_server_address is None:
