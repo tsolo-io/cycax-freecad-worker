@@ -36,7 +36,7 @@ format: ## Format the source code
 spelling:
 	hatch run lint:spell
 
-docs:
+docs: ## Create project documentation
 	hatch run docs:build
 
 docs-open: ## Open the documentation in your default browser (Linux only)
@@ -44,18 +44,3 @@ docs-open: ## Open the documentation in your default browser (Linux only)
 
 docs-serve: ## Run the documentation server locally
 	hatch run docs:serve
-
-start: ## Start the development environment with docker compose
-	CURRENT_UID=$(shell id -u):$(shell id -g) docker compose up -d
-
-stop: ## Stop the docker compose development environment
-	CURRENT_UID=$(shell id -u):$(shell id -g) docker compose down
-
-ps: ## Show the docker compose development environment processes
-	CURRENT_UID=$(shell id -u):$(shell id -g) docker compose ps
-
-logs: ## Show the docker compose development environment logs
-	docker compose logs -f
-
-restart: stop start ## Restart the docker compose development environment
-
