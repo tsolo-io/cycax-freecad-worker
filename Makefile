@@ -18,7 +18,10 @@ build: ## Build containers
 	chmod a+x dist/cycax-freecad-worker.sh
 
 run: ## Run the CyCAx Server directly
-	hatch run uvicorn cycax_server.main:app --reload --host 0.0.0.0 --port 8765
+	./dist/cycax-freecad-worker.sh
+
+run-bin: ## Run the distributable shell command
+	./dist/cycax-freecad-worker.sh
 
 test: ## Run the basic unit tests, skip the ones that require a connection to ceph cluster.
 	hatch run testing:test
