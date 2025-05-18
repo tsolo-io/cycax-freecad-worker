@@ -7,19 +7,15 @@ name = "cycax-freecad-worker"
 dynamic = ["version"]
 description = ''
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11.0,<3.12"
 license = "Apache-2.0"
 keywords = []
 authors = [{ name = "Martin Slabber", email = "martin@tsolo.io" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = []
 
@@ -76,12 +72,12 @@ all = ["style", "typing"]
 Pn = "Pn"
 
 [tool.black]
-target-version = ["py310"]
+target-version = ["py311"]
 line-length = 120
 skip-string-normalization = true
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 lint.select = [
   "A",
