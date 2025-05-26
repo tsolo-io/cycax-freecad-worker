@@ -20,7 +20,6 @@ jobs:
         run: |
           git submodule update --init --recursive --progress
           make build
-          cp dist/* docker/.
       - name: Login to Docker Registry # Build a special version of linuxserver FreeCAD Docker container.
         uses: docker/login-action@v3
         with:
