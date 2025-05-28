@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Tsolo.io
+#
+# SPDX-License-Identifier: Apache-2.0
+
 if [ -z "${CYCAX_SERVER}" ]
 then
   echo "CYCAX_SERVER has to be defined."

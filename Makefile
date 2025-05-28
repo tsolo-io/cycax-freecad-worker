@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 Tsolo.io
+#
+# SPDX-License-Identifier: Apache-2.0
+
 .ONESHELL: # Run all the commands in the same shell
 .PHONY: docs
 .DEFAULT_GOAL := help
@@ -18,7 +22,10 @@ build: ## Build containers
 	chmod a+x dist/cycax-freecad-worker.sh
 
 run: ## Run the CyCAx Server directly
-	hatch run uvicorn cycax_server.main:app --reload --host 0.0.0.0 --port 8765
+	./dist/cycax-freecad-worker.sh
+
+run-bin: ## Run the distributable shell command
+	./dist/cycax-freecad-worker.sh
 
 test: ## Run the basic unit tests, skip the ones that require a connection to ceph cluster.
 	hatch run testing:test
@@ -33,7 +40,7 @@ format: ## Format the source code
 spelling:
 	hatch run lint:spell
 
-docs:
+docs: ## Create project documentation
 	hatch run docs:build
 
 docs-open: ## Open the documentation in your default browser (Linux only)
@@ -41,18 +48,3 @@ docs-open: ## Open the documentation in your default browser (Linux only)
 
 docs-serve: ## Run the documentation server locally
 	hatch run docs:serve
-
-start: ## Start the development environment with docker compose
-	CURRENT_UID=$(shell id -u):$(shell id -g) docker compose up -d
-
-stop: ## Stop the docker compose development environment
-	CURRENT_UID=$(shell id -u):$(shell id -g) docker compose down
-
-ps: ## Show the docker compose development environment processes
-	CURRENT_UID=$(shell id -u):$(shell id -g) docker compose ps
-
-logs: ## Show the docker compose development environment logs
-	docker compose logs -f
-
-restart: stop start ## Restart the docker compose development environment
-

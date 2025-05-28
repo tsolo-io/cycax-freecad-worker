@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2025 Tsolo.io
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Build
+run-name: CyCAx FreeCAD Worker
+on: [push]
+
+jobs:
+  publish:
+    runs-on: "ubuntu-22.04"
+    container:
+      image: gitea.tu.tsolo.net/tsolo/ubuntu:22-dev
+    steps:
+      - name: Setup Python
+        uses: https://gitea.com/actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Hatch
+        run: pip install hatch
+      - name: Check out repository code
+        uses: https://gitea.com/actions/checkout@v4
+      - name: Build the utilities
+        run: |
+          git submodule update --init --recursive --progress
+          make build
+      - name: Login to Docker Registry # Build a special version of linuxserver FreeCAD Docker container.
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.REGISTRYHOST }}
+          username: ${{ vars.REGISTRYUSER }}
+          password: ${{ secrets.REGISTRYPASSWORD }}
+      - name: Set up Docker Buildx
+        uses: https://github.com/docker/setup-buildx-action@v3
+      - name: Build and push Docker image
+        uses: https://github.com/docker/build-push-action@v5
+        with:
+          context: ./docker/docker-freecad/
+          # file: ./Dockerfile
+          push: true
+          tags: gitea.tu.tsolo.net/tsolo/tsolo-freecad:1.0
+      # End of the build
+      - name: Make containers and publish
+        uses: https://gitea.tu.tsolo.net/Tsolo/container-build-publish-action@main
+        with:
+          registrypassword: ${{ secrets.REGISTRYPASSWORD }}
