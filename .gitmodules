@@ -2,9 +2,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-[submodule "docker/-f"]
-	path = docker/-f
-	url = https://github.com/jaecktec/docker-freecad.git
 [submodule "docker/docker-freecad"]
 	path = docker/docker-freecad
 	url = https://github.com/jaecktec/docker-freecad.git
+	branch = chore/v1-release
