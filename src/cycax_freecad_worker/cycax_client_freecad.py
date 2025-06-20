@@ -147,6 +147,8 @@ class EngineFreecad:
             rotation2 = App.Rotation(Vector(0, 1, 0), 90)
         elif side == RIGHT:
             rotation2 = App.Rotation(Vector(0, 1, 0), 270)
+        else:
+            rotation2 = App.Rotation(Vector(0, 0, 0), 0)
 
         nut.Placement = App.Placement(Vector(x, y, z), rotation2 * rotation1)
 
@@ -166,7 +168,6 @@ class EngineFreecad:
         angles = [0, 0, 0]
         if center is False:
             if features["side"] is not None:
-                angles = features["side"]
                 angles = {
                     TOP: [pos_vec[0], pos_vec[1], pos_vec[2] - features["z_size"]],
                     BACK: [pos_vec[0], pos_vec[1] - features["y_size"], pos_vec[2]],
@@ -174,7 +175,7 @@ class EngineFreecad:
                     FRONT: [pos_vec[0], pos_vec[1], pos_vec[2]],
                     LEFT: [pos_vec[0], pos_vec[1], pos_vec[2]],
                     RIGHT: [pos_vec[0] - features["x_size"], pos_vec[1], pos_vec[2]],
-                }[angles]
+                }[features["side"]]
         else:
             angles = [pos_vec[0], pos_vec[1], pos_vec[2]]
 
@@ -200,11 +201,15 @@ class EngineFreecad:
             x = feature["x"]
             y = feature["y"]
             z = feature["z"]
-        else:
+        elif move is not None:
             cyl = Part.makeCylinder(radius, depth, pos_vec)
             x = move["x"]
             y = move["y"]
             z = move["z"]
+        else:
+            msg = "Either feature or move must be provided"
+            raise ValueError(msg)
+
         if side == FRONT:
             cyl.Placement = App.Placement(Vector(x, y, z), App.Rotation(Vector(1, 0, 0), 270))
         elif side == BACK:
@@ -219,7 +224,7 @@ class EngineFreecad:
             cyl.Placement = App.Placement(Vector(x, y, z), App.Rotation(Vector(0, 1, 0), 270))
         return cyl
 
-    def render_to_png(self, path: Path, view: str | None = None):
+    def render_to_png(self, path: Path, view: str):
         """Used to create a png of the desired side.
 
         Args:
@@ -269,11 +274,11 @@ class EngineFreecad:
             case "ALL":
                 active_doc.activeView().viewAxometric()
             case _:
-                msg = f"side: {side} is not one of TOP, BOTTOM, LEFT, RIGHT, FRONT BACK OR ALL."
+                msg = f"side: {side} is not one of TOP, BOTTOM, LEFT, RIGHT, FRONT, BACK, OR ALL."
                 raise ValueError(msg)
         return side
 
-    def render_to_dxf(self, path: Path, active_doc: App.Document, view: str | None = None) -> Path:
+    def render_to_dxf(self, path: Path, active_doc: App.Document, view: str) -> Path:
         """This method will be used for creating a dxf of the object currently in view.
         Args:
             active_doc: The FreeCAD document.
@@ -289,7 +294,7 @@ class EngineFreecad:
         importDXF.export(__objs__, str(target_image_file))
         return target_image_file
 
-    def render_to_svg(self, path: Path, active_doc: App.Document, view: str | None = None) -> Path:
+    def render_to_svg(self, path: Path, active_doc: App.Document, view: str) -> Path:
         """This method will be used for creating a svg of the object currently in view.
         Args:
             active_doc: The FreeCAD document.
@@ -338,6 +343,9 @@ class EngineFreecad:
             cube = Part.makeBox(length, depth, length, Vector(x, y, z))
         elif side in [LEFT, RIGHT]:
             cube = Part.makeBox(depth, length, length, Vector(x, y, z))
+        else:
+            msg = f"Invalid side: {side}"
+            raise ValueError(msg)
 
         return cube
 
@@ -388,8 +396,9 @@ class EngineFreecad:
 
         hypot = sqrt(features["size"] * 2 * features["size"] * 2 + features["size"] * 2 * features["size"] * 2) / 3
         move_cutter_cyl = {"x": 0, "y": 0, "z": 0}
-        move_cutter_rhombus = {"x": 0, "y": 0, "z": 0}
-        move_cube = {"x": 0, "y": 0, "z": 0}
+        move_cutter_rhombus = {"x": 0.0, "y": 0.0, "z": 0.0}
+        move_cube = {"x": 0.0, "y": 0.0, "z": 0.0}
+
         if features["bound1"] == 0:
             move_cutter_cyl[features["axis1"]] = features["size"]
             move_cutter_rhombus[features["axis1"]] = hypot
@@ -398,6 +407,7 @@ class EngineFreecad:
             move_cutter_cyl[features["axis1"]] = features["bound1"] - features["size"]
             move_cutter_rhombus[features["axis1"]] = features["bound1"] - hypot
             move_cube[features["axis1"]] = features["bound1"] - features["size"]
+
         if features["bound2"] == 0:
             move_cutter_cyl[features["axis2"]] = features["size"]
             move_cutter_rhombus[features["axis2"]] = hypot
@@ -414,7 +424,6 @@ class EngineFreecad:
                 side=features["side"],
                 move=move_cutter_cyl,
             )
-
         elif features["edge_type"] == "chamfer":
             cutter = self._rhombus(
                 depth=features["depth"],
@@ -422,6 +431,9 @@ class EngineFreecad:
                 move=move_cutter_rhombus,
                 side=features["side"],
             )
+        else:
+            msg = f"Unknown edge type: {features["edge_type"]}"
+            raise ValueError(msg)
 
         cube = self._beveled_edge_cube(
             length=features["size"],
@@ -438,6 +450,7 @@ class EngineFreecad:
 
     def construct_from_features(self, doc, features: list[dict], part_path: Path) -> Path:
         cut_features = []
+        solid = self.cube(features[0])  # Just a placeholder. Should set this to a 1mm cube.
         for feature in features:
             if feature["type"] == "add":
                 solid = self.cube(feature)
@@ -496,15 +509,14 @@ class EngineFreecad:
         outformats = "PNG,STL,DXF"
         for out_choice in outformats.upper().split(","):
             ftype = out_choice
-            fview = None
             out_format = ftype.strip()
             match out_format:
                 case "PNG":
-                    file_list.append(self.render_to_png(part_path, view=fview))
+                    file_list.append(self.render_to_png(part_path, view="ALL"))
                 case "DXF":
-                    file_list.append(self.render_to_dxf(part_path, view=fview, active_doc=doc))
+                    file_list.append(self.render_to_dxf(part_path, view="TOP", active_doc=doc))
                 case "SVG":
-                    file_list.append(self.render_to_svg(part_path, view=fview, active_doc=doc))
+                    file_list.append(self.render_to_svg(part_path, view="ALL", active_doc=doc))
                 case "STL":
                     file_list.append(self.render_to_stl(part_path, active_doc=doc))
                 case _:
@@ -523,15 +535,12 @@ def set_task_state(server_address: str, job_id: str, state: str):
     # Check the state. The server should raise some error if state change was not allowed.
 
 
-def get_jobs(server_address) -> dict:
+def get_jobs(server_address: str):
     """Find the next job to work on.
 
     The jobs_path variable should point to a directory containing symlinks
     to cycax parts. Each part directory is evaluated to see if there is an
     JSON definition for the part.
-
-    Args:
-        jobs_path: The directory with symlinks to parts to process.
 
     """
     sleep_for: int = 1
@@ -563,7 +572,6 @@ def get_jobs(server_address) -> dict:
         except requests.exceptions.ConnectionError as error:
             logging.warning(error)
             time.sleep(MAX_SLEEP_DURATION)
-    return None
 
 
 def get_job_spec(server_address: str, job: dict) -> dict:
@@ -588,12 +596,12 @@ def upload_files(server_address: str, job: dict, file_list: list[Path]):
         while retry > 0:
             try:
                 upload_file(url, filepath)
-            except Exception:
+                retry = -10
+            except Exception as error:
                 retry -= 1
+                logging.warning("Upload failed: %s", error)
                 time.sleep(3)
-            else:
-                break  # out of the while loop
-        if retry == 0:
+        if retry == -10:  # noqa: PLR2004 magic number
             break  # out of the for loop, skip for-else.
     else:
         # Success
@@ -621,14 +629,15 @@ def main(cycax_server_address: str):
 if os.environ.get("PYTEST_VERSION") is None:
     # Not in the unit test.
     # START
-    cycax_server_address = os.getenv("CYCAX_SERVER").strip("/")
+    cycax_server_address = os.getenv("CYCAX_SERVER")
     if cycax_server_address is None:
         logging.error("CYCAX_SERVER environment variable is not defined or set.")
         QtGui.QApplication.quit()
 
     try:
-        main(cycax_server_address)
+        main(str(cycax_server_address).strip("/"))
     except Exception:
-        logging.exception("Unexpected")
-    logging.info("End of application. Normal termination.")
+        logging.exception("Unexpected end of application.")
+    else:
+        logging.info("End of application. Normal termination.")
     QtGui.QApplication.quit()
