@@ -122,8 +122,6 @@ class EngineFreecad:
             feature: this is a dict containing the necessary details of the hexigon like its size and location.
         """
 
-        rotation1 = App.Rotation(Vector(0, 0, 0), 0)
-        rotation2 = App.Rotation(Vector(0, 0, 0), 0)
         hexigon = self._calc_hex(depth=0, diameter=feature["diameter"])
         nut = hexigon.extrude(App.Vector(0, 0, feature["depth"]))
 
@@ -149,6 +147,8 @@ class EngineFreecad:
             rotation2 = App.Rotation(Vector(0, 1, 0), 90)
         elif side == RIGHT:
             rotation2 = App.Rotation(Vector(0, 1, 0), 270)
+        else:
+            rotation2 = App.Rotation(Vector(0, 0, 0), 0)
 
         nut.Placement = App.Placement(Vector(x, y, z), rotation2 * rotation1)
 
