@@ -417,14 +417,15 @@ class EngineFreecad:
             move_cutter_rhombus[features["axis2"]] = features["bound2"] - hypot
             move_cube[features["axis2"]] = features["bound2"] - features["size"]
 
-        if features["edge_type"] == "round":
+        edge_type = features.get("edge_type")
+        if edge_type == "round":
             cutter = self.hole(
                 radius=features["size"],
                 depth=features["depth"],
                 side=features["side"],
                 move=move_cutter_cyl,
             )
-        elif features["edge_type"] == "chamfer":
+        elif edge_type== "chamfer":
             cutter = self._rhombus(
                 depth=features["depth"],
                 length=features["size"],
@@ -432,7 +433,7 @@ class EngineFreecad:
                 side=features["side"],
             )
         else:
-            msg = f"Unknown edge type: {features["edge_type"]}"
+            msg = f"Unknown edge type: {edge_type}"
             raise ValueError(msg)
 
         cube = self._beveled_edge_cube(
@@ -591,18 +592,21 @@ def upload_file(url: str, filepath: Path):
 
 def upload_files(server_address: str, job: dict, file_list: list[Path]):
     url = server_address + f"/jobs/{job['id']}/artifacts"
+    print("uploading files", job, file_list)
     for filepath in file_list:
         retry = 3
+        error = None
         while retry > 0:
             try:
                 upload_file(url, filepath)
                 retry = -10
+                error = None
             except Exception as error:
                 retry -= 1
                 logging.warning("Upload failed: %s", error)
                 time.sleep(3)
-        if retry == -10:  # noqa: PLR2004 magic number
-            break  # out of the for loop, skip for-else.
+        if error:
+            raise error
     else:
         # Success
         set_task_state(server_address, job["id"], "COMPLETED")
@@ -632,12 +636,11 @@ if os.environ.get("PYTEST_VERSION") is None:
     cycax_server_address = os.getenv("CYCAX_SERVER")
     if cycax_server_address is None:
         logging.error("CYCAX_SERVER environment variable is not defined or set.")
-        QtGui.QApplication.quit()
-
-    try:
-        main(str(cycax_server_address).strip("/"))
-    except Exception:
-        logging.exception("Unexpected end of application.")
     else:
-        logging.info("End of application. Normal termination.")
+        try:
+            main(str(cycax_server_address).strip("/"))
+        except Exception:
+            logging.exception("Unexpected end of application.")
+        else:
+            logging.info("End of application. Normal termination.")
     QtGui.QApplication.quit()

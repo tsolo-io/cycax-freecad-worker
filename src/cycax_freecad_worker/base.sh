@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+source .env || true
+
 if [ -z "${CYCAX_SERVER}" ]
 then
   echo "CYCAX_SERVER has to be defined."
