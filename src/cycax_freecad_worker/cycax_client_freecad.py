@@ -592,7 +592,6 @@ def upload_file(url: str, filepath: Path):
 
 def upload_files(server_address: str, job: dict, file_list: list[Path]):
     url = server_address + f"/jobs/{job['id']}/artifacts"
-    print("uploading files", job, file_list)
     for filepath in file_list:
         retry = 3
         error = None
