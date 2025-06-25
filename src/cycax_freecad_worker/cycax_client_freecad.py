@@ -425,7 +425,7 @@ class EngineFreecad:
                 side=features["side"],
                 move=move_cutter_cyl,
             )
-        elif edge_type== "chamfer":
+        elif edge_type == "chamfer":
             cutter = self._rhombus(
                 depth=features["depth"],
                 length=features["size"],
@@ -606,13 +606,11 @@ def upload_files(server_address: str, job: dict, file_list: list[Path]):
                 time.sleep(3)
         if error:
             raise error
-    else:
-        # Success
-        set_task_state(server_address, job["id"], "COMPLETED")
+    # Success
+    set_task_state(server_address, job["id"], "COMPLETED")
 
 
 def main(cycax_server_address: str):
-
     engine = EngineFreecad()
     task_counter = 50
     for job in get_jobs(cycax_server_address):
